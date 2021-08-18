@@ -1,6 +1,7 @@
 {
-    "board": "espressif:esp32:esp32wrover",
+    "board": "esp32:esp32:esp32wrover",
     "configuration": "PartitionScheme=huge_app,FlashMode=qio,FlashFreq=80,UploadSpeed=921600,DebugLevel=none",
-    "port": "COM3",
-    "sketch": "Code_Security_Camera_ESP32CAM_Blynk_02.ino"
+    "port": "COM6",
+    "sketch": "ESP32CAM_Telegram.ino",
+    "output": "../build"
 }

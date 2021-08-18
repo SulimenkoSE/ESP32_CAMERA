@@ -20,7 +20,7 @@
  *  GPIO 0 must be connected to GND pin while uploading the sketch
  *  After connecting GPIO 0 to GND pin, press the ESP32 CAM on-board RESET button to put the board in flashing mode
  ***************************************************************************************/
-
+/* *
 #include "esp_camera.h"
 #include <WiFi.h>
 #include <WiFiClient.h>
@@ -158,4 +158,10 @@ void loop()
     Serial.println("Capture Photo");
     takePhoto();
   }
-}
+} */
+
+/*
+const char *ssid = "Nina_Iot";                                        // REPLACE mySSID WITH YOUR WIFI SSID
+const char *pass = "Sergik9876632";                                   // REPLACE myPassword YOUR WIFI PASSWORD, IF ANY
+const char *token = "1554215186:AAEbD7gVmPe8dlIbMob_PsGV7vaE_L6bVHk"; // REPLACE myToken WITH YOUR TELEGRAM BOT TOKEN
+*/
