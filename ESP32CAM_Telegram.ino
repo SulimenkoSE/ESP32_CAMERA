@@ -73,7 +73,7 @@ bool isKeyboardActive; // store if the reply keyboard is shown
 
 // REPLACE myPassword YOUR WIFI PASSWORD, IF ANY
 const char *ssid_0 = "********";
-const char *pass_0 = "********;
+const char *pass_0 = "********";
 const char *ssid_1 = "********";
 const char *pass_1 = "********";
 
