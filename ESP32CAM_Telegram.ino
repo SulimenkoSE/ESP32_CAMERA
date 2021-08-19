@@ -78,7 +78,7 @@ const char *ssid_1 = "********";
 const char *pass_1 = "********";
 
 const char *token = "********:********************************"; // REPLACE myToken WITH YOUR TELEGRAM BOT TOKEN
-//chat_id: 387342374
+//chat_id: *******
 #pragma endregion
 
 // Struct for saving time datas (needed for time-naming the image files)
