@@ -212,7 +212,7 @@ bool SD_MMC_Setup()
 String listDir(fs::FS &fs, const char *dirname, uint8_t levels)
 {
     //char _buffer[128] = {};
-    char msg_txt[] = {"_ALL_OK!"};
+    String msg_txt = "List Dir:\n";
     xSemaphoreTake(serial_Mutex, portMAX_DELAY);
     Serial.printf("Listing directory: %s\r\n", dirname);
 
@@ -234,14 +234,18 @@ String listDir(fs::FS &fs, const char *dirname, uint8_t levels)
         if (file.isDirectory())
         {
             Serial.printf("  DIR : %s \n", file.name());
-
+            msg_txt += file.name();
+            msg_txt += "\n";
             if (levels)
                 listDir(fs, file.name(), levels - 1);
         }
         else
         {
             Serial.printf(" FILE: %s\tSIZE: %d\n", file.name(), file.size());
-
+            msg_txt += file.name();
+            msg_txt += ". Size = ";
+            msg_txt += file.size();
+            msg_txt += "\n";
             //sprintf(_buffer, " %s\n", file.name());
             //strcat(msg_txt, _buffer);
         }
@@ -249,6 +253,40 @@ String listDir(fs::FS &fs, const char *dirname, uint8_t levels)
     }
     xSemaphoreGive(serial_Mutex);
     return msg_txt;
+}
+
+String Open_File(fs::FS &fs, String Name_File)
+{
+    // Path where new picture will be saved
+    String path = "/";
+    path += String(Name_File);
+    Serial.printf("Open file ... %s ", Name_File);
+
+    File file = fs.open(path.c_str(), FILE_READ);
+    byte tyres = 5;
+    while (--tyres && !file)
+    {
+        Serial.println("Failed to open file in reading mode");
+        delay(500);
+        if (!SD_MMC_Setup())
+        {
+            return "";
+        }
+        else
+        {
+            Serial.println(" OK!");
+            file = fs.open(path.c_str(), FILE_WRITE);
+        }
+        delay(100);
+    }
+
+    if (!file)
+    {
+        Serial.println("Sory for 5 setup SD csrd no mode");
+        return "";
+    }
+
+    return path;
 }
 
 String takePicture(fs::FS &fs)
@@ -322,7 +360,7 @@ String takePicture(fs::FS &fs)
 
 void Task_Message_Code(void *args)
 {
-
+    bool file_From_SD = false;
     while (true)
     {
         // a variable to store telegram message data
@@ -410,11 +448,34 @@ void Task_Message_Code(void *args)
                             // print every others messages received
                             myBot.sendMessage(msg, listing);
                         }
-                        else
-
+                        else if (msg.text == "File from SD")
                         {
-                            // print every others messages received
-                            myBot.sendMessage(msg, msg.text);
+                            if (!file_From_SD)
+                            {
+                                file_From_SD = true;
+                                myBot.sendMessage(msg, "Input file name in format /name_File");
+                            }
+                        }
+                        else
+                        {
+                            if (file_From_SD)
+                            {
+                                file_From_SD = false;
+                                String myFile = Open_File(filesystem, String(msg.text));
+                                if (myFile != "")
+                                {
+                                    if (!myBot.sendPhotoByFile(msg.sender.id, myFile, filesystem))
+                                    {
+                                        Serial.println("Photo send from SD is failed");
+                                    }
+                                    Serial.println("Photo send from SD is ok!");
+                                }
+                                myBot.sendMessage(msg, "I`m sorry this file not in SD card");
+                            }
+                            else
+                            { // print every others messages received
+                                myBot.sendMessage(msg, msg.text);
+                            }
                         }
                     }
                 }
