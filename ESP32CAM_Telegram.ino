@@ -18,6 +18,8 @@
 #include "soc/soc.h"          // Brownout error fix
 #include "soc/rtc_cntl_reg.h" // Brownout error fix
 
+#include "wifi_Keys.h"
+
 #pragma region Defines
 
 #define USE_MMC true // Define where store images (on board SD card reader or internal flash memory)
@@ -71,14 +73,16 @@ InlineKeyboard myInlineKbd; // inline keyboard object helper
 #pragma region Variable
 bool isKeyboardActive; // store if the reply keyboard is shown
 
+// REPLACE myPassword YOUR WIFI PASSWORD, IF ANY IN FILE wifi_Keys.h
+extern const char *ssid_0;
+extern const char *pass_0;
+extern const char *ssid_1;
+extern const char *pass_1;
+extern const char *ssid_2;
+extern const char *pass_2;
 // REPLACE myPassword YOUR WIFI PASSWORD, IF ANY
-const char *ssid_0 = "********";
-const char *pass_0 = "********";
-const char *ssid_1 = "********";
-const char *pass_1 = "********";
+extern const char *token; // REPLACE myToken WITH YOUR TELEGRAM BOT TOKEN
 
-const char *token = "********:********************************"; // REPLACE myToken WITH YOUR TELEGRAM BOT TOKEN
-//chat_id: *******
 #pragma endregion
 
 // Struct for saving time datas (needed for time-naming the image files)
@@ -129,7 +133,18 @@ void cameraSetup(framesize_t frameSize)
     config.pixel_format = PIXFORMAT_JPEG;
     config.fb_count = 1;
     //init with high specs to pre-allocate larger buffers
-    if (psramFound() && frameSize == FRAMESIZE_UXGA)
+    /*FRAMESIZE_QQVGA,    // 160x120
+    FRAMESIZE_QQVGA2,   // 128x160
+    FRAMESIZE_QCIF,     // 176x144
+    FRAMESIZE_HQVGA,    // 240x176
+    FRAMESIZE_QVGA,     // 320x240
+    FRAMESIZE_CIF,      // 400x296
+    FRAMESIZE_VGA,      // 640x480
+    FRAMESIZE_SVGA,     // 800x600
+    FRAMESIZE_XGA,      // 1024x768
+    FRAMESIZE_SXGA,     // 1280x1024
+    FRAMESIZE_UXGA,     // 1600x1200*/
+    if (psramFound() && frameSize == FRAMESIZE_XGA)
     {
         config.frame_size = FRAMESIZE_UXGA;
         config.jpeg_quality = 10;
@@ -159,13 +174,39 @@ void cameraSetup(framesize_t frameSize)
     }
 
     sensor_t *s = esp_camera_sensor_get();
-    //initial sensors are flipped vertically and colors are a bit saturated
+    s->set_vflip(s, 1); //flip it back
+                        //s->set_brightness(s, 0); // -2 to 2
+                        //initial sensors are flipped vertically and colors are a bit saturated
     /* if (s->id.PID == OV3660_PID)
 	{
 		s->set_vflip(s, 1);		  //flip it back
 		s->set_brightness(s, 1);  //up the blightness just a bit
 		s->set_saturation(s, -2); //lower the saturation
-	} */
+	} 
+    
+    s->set_brightness(s, 0);     // -2 to 2
+    s->set_contrast(s, 0);       // -2 to 2
+    s->set_saturation(s, 0);     // -2 to 2
+    s->set_special_effect(s, 0); // 0 to 6 (0 - No Effect, 1 - Negative, 2 - Grayscale, 3 - Red Tint, 4 - Green Tint, 5 - Blue Tint, 6 - Sepia)
+    s->set_whitebal(s, 1);       // 0 = disable , 1 = enable
+    s->set_awb_gain(s, 1);       // 0 = disable , 1 = enable
+    s->set_wb_mode(s, 0);        // 0 to 4 - if awb_gain enabled (0 - Auto, 1 - Sunny, 2 - Cloudy, 3 - Office, 4 - Home)
+    s->set_exposure_ctrl(s, 1);  // 0 = disable , 1 = enable
+    s->set_aec2(s, 0);           // 0 = disable , 1 = enable
+    s->set_ae_level(s, 0);       // -2 to 2
+    s->set_aec_value(s, 300);    // 0 to 1200
+    s->set_gain_ctrl(s, 1);      // 0 = disable , 1 = enable
+    s->set_agc_gain(s, 0);       // 0 to 30
+    s->set_gainceiling(s, (gainceiling_t)0);  // 0 to 6
+    s->set_bpc(s, 0);            // 0 = disable , 1 = enable
+    s->set_wpc(s, 1);            // 0 = disable , 1 = enable
+    s->set_raw_gma(s, 1);        // 0 = disable , 1 = enable
+    s->set_lenc(s, 1);           // 0 = disable , 1 = enable
+    s->set_hmirror(s, 0);        // 0 = disable , 1 = enable
+    s->set_vflip(s, 0);          // 0 = disable , 1 = enable
+    s->set_dcw(s, 1);            // 0 = disable , 1 = enable
+    s->set_colorbar(s, 0);       // 0 = disable , 1 = enable
+    */
 
 #if defined(CAMERA_MODEL_M5STACK_WIDE)
     s->set_vflip(s, 1);
@@ -251,13 +292,53 @@ String listDir(fs::FS &fs, const char *dirname, uint8_t levels)
     xSemaphoreGive(serial_Mutex);
     return msg_txt;
 }
+void createDir(fs::FS &fs, const char *path)
+{
+    Serial.printf("Creating Dir: %s\n", path);
+    if (fs.mkdir(path))
+    {
+        Serial.println("Dir created");
+    }
+    else
+    {
+        Serial.println("mkdir failed");
+    }
+}
+
+void removeDir(fs::FS &fs, const char *path)
+{
+    Serial.printf("Removing Dir: %s\n", path);
+    if (fs.rmdir(path))
+    {
+        Serial.println("Dir removed");
+    }
+    else
+    {
+        Serial.println("rmdir failed");
+    }
+}
 
 String Open_File(fs::FS &fs, String Name_File)
 {
     // Path where new picture will be saved
-    String path = "/";
-    path += String(Name_File);
-    Serial.printf("Open file ... %s ", Name_File);
+    String name_Dir = "/";
+    getLocalTime(&timeinfo);
+    // Dir create for new picture to will be saved
+    /* name_Dir = "/";
+    name_Dir += String(timeinfo.tm_year + 1900);
+    name_Dir = "/";
+    name_Dir += String(timeinfo.tm_mon + 1);
+    name_Dir = "/";
+    name_Dir += String(timeinfo.tm_mday);
+    createDir(fs, name_Dir); */
+
+    String path = name_Dir;
+    if (Name_File.endsWith(" "))
+        Name_File.substring(1, Name_File.length());
+
+    path += Name_File;
+    path += ".jpg";
+    Serial.printf("Open file ... %s ", Name_File.c_str());
 
     File file = fs.open(path.c_str(), FILE_READ);
     byte tyres = 5;
@@ -289,14 +370,23 @@ String Open_File(fs::FS &fs, String Name_File)
 String takePicture(fs::FS &fs)
 {
 
-    // Set filename with current timestamp "YYYYMMDD_HHMMSS.jpg"
     char pictureName[FILENAME_SIZE];
+    String name_Dir = "/";
     getLocalTime(&timeinfo);
+    /*// Dir create for new picture to will be saved
+    name_Dir += String(timeinfo.tm_year + 1900);
+    name_Dir += "/";
+    name_Dir += String(timeinfo.tm_mon + 1);
+    name_Dir += "/";
+    name_Dir += String(timeinfo.tm_mday);
+    createDir(fs, name_Dir); */
+
+    // Set filename with current timestamp "YYYYMMDD_HHMMSS.jpg"
     snprintf(pictureName, FILENAME_SIZE, "%02d%02d%02d_%02d%02d%02d.jpg", timeinfo.tm_year + 1900,
              timeinfo.tm_mon + 1, timeinfo.tm_mday, timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
 
     // Path where new picture will be saved
-    String path = "/";
+    String path = name_Dir;
     path += String(pictureName);
     Serial.printf("Save file ... %s ", pictureName);
 
@@ -406,27 +496,27 @@ void Task_Message_Code(void *args)
                         if (msg.text == "Take photo")
                         {
                             Serial.println("\nSending Photo from CAM");
-                            vTaskSuspend(task_Picture_Handler);
+                            //vTaskSuspend(task_Picture_Handler);
                             // Take picture and save to file
                             String myFile = takePicture(filesystem);
+                            //vTaskResume(task_Picture_Handler);
                             if (myFile != "")
                             {
                                 if (!myBot.sendPhotoByFile(msg.sender.id, myFile, filesystem))
                                 {
                                     Serial.println("Photo send failed");
                                 }
-                                Serial.println("Photo send is ok!");
+                                //Serial.println("Photo send is ok!");
                                 //If you don't need to keep image in memory, delete it
                                 if (KEEP_IMAGE == false)
                                 {
                                     filesystem.remove("/" + myFile);
                                 }
                             }
-                            vTaskResume(task_Picture_Handler);
                         }
                         else if (msg.text == "Save photo")
                         {
-                            vTaskSuspend(task_Picture_Handler);
+                            //vTaskSuspend(task_Picture_Handler);
                             Serial.print("Sending Photo from CAM. ");
                             // Take picture and save to file
                             String myFile = takePicture(filesystem);
@@ -437,7 +527,7 @@ void Task_Message_Code(void *args)
                                 sprintf(file_name, "Save file name - %s", myFile.c_str());
                                 myBot.sendMessage(msg, file_name);
                             }
-                            vTaskResume(task_Picture_Handler);
+                            //vTaskResume(task_Picture_Handler);
                         }
                         else if (msg.text == "List dir SD")
                         {
@@ -458,6 +548,7 @@ void Task_Message_Code(void *args)
                             if (file_From_SD)
                             {
                                 file_From_SD = false;
+                                Serial.println(msg.text);
                                 String myFile = Open_File(filesystem, String(msg.text));
                                 if (myFile != "")
                                 {
@@ -465,9 +556,11 @@ void Task_Message_Code(void *args)
                                     {
                                         Serial.println("Photo send from SD is failed");
                                     }
-                                    Serial.println("Photo send from SD is ok!");
+                                    else
+                                        Serial.println("Photo send from SD is ok!");
                                 }
-                                myBot.sendMessage(msg, "I`m sorry this file not in SD card");
+                                else
+                                    myBot.sendMessage(msg, "I`m sorry this file not in SD card");
                             }
                             else
                             { // print every others messages received
@@ -544,7 +637,7 @@ void Task_Message_Code(void *args)
     }
 }
 
-void Task_Picture_Code(void *args)
+/* void Task_Picture_Code(void *args)
 {
     while (true)
     {
@@ -556,19 +649,19 @@ void Task_Picture_Code(void *args)
         Serial.print("Sending Photo from CAM. ");
         // Take picture and save to file
         String myFile = takePicture(filesystem);
-        /* if (myFile != "")
+        if (myFile != "")
         {
             //Serial.printf("Save file name - %s is OK!", myFile.c_str());
             String _buffer_message;
             _buffer_message = "Save file name -";
             _buffer_message += myFile.c_str();
             myBot.sendTo( 387342374,_buffer_message,"");
-        } */
+        }
         xSemaphoreGive(serial_Mutex);
         vTaskResume(task_WiFi_Handler);
         vTaskResume(task_Message_Handler);
     }
-}
+} */
 
 void Task_WiFi_Code(void *args)
 {
@@ -701,6 +794,9 @@ void setup()
     myReplyKbd.addButton("List dir SD");
     // add a new empty button row
     myReplyKbd.addRow();
+    myReplyKbd.addButton("File from SD");
+    // add a new empty button row
+    myReplyKbd.addRow();
     // add another button that send the user position (location)
     myReplyKbd.addButton("Send Location", KeyboardButtonLocation);
     // add another button that send the user contact
@@ -728,13 +824,13 @@ void setup()
         12,                     //Priority of the task
         &task_Message_Handler); //Task handle.
                                 //Start Task Picture
-    xTaskCreate(
+    /* xTaskCreate(
         Task_Picture_Code,      //Function to implement the task
         "Task_Picture",         //Name of the task
         15000,                  //Stack size in words
         NULL,                   //Task input parameter
         13,                     //Priority of the task
-        &task_Picture_Handler); //Task handle.
+        &task_Picture_Handler); //Task handle. */
 }
 
 void loop()
